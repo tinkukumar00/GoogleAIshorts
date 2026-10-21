@@ -4,6 +4,13 @@ export type ReframeMode = 'smart-face' | 'split-screen' | 'blur-fill' | 'center-
 
 export type CaptionStyleId = 'hormozi' | 'neon-cyber' | 'apple-clean' | 'comic-pop' | 'bold-minimal';
 
+export interface UserProfile {
+  name: string;
+  email: string;
+  avatar: string;
+  isLoggedIn: boolean;
+}
+
 export interface CaptionWord {
   word: string;
   start: number; // in seconds relative to clip start

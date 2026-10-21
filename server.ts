@@ -204,6 +204,78 @@ Return ONLY valid JSON matching this exact structure, with no markdown code fenc
   }
 });
 
+// OAuth: Construct Provider Authorization URL
+app.get('/api/auth/url', (req, res) => {
+  const platform = (req.query.platform as string) || 'youtube';
+  const baseUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+  const redirectUri = `${baseUrl}/auth/callback`;
+
+  if (platform === 'youtube') {
+    const clientId = process.env.GOOGLE_CLIENT_ID || 'google-client-id';
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly email profile',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: 'youtube',
+    });
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    return res.json({ url, redirectUri, platform });
+  } else if (platform === 'instagram') {
+    const igClientId = process.env.INSTAGRAM_CLIENT_ID || 'instagram-client-id';
+    const params = new URLSearchParams({
+      client_id: igClientId,
+      redirect_uri: redirectUri,
+      scope: 'instagram_basic,instagram_content_publish,pages_show_list',
+      response_type: 'code',
+      state: 'instagram',
+    });
+    const url = `https://api.instagram.com/oauth/authorize?${params.toString()}`;
+    return res.json({ url, redirectUri, platform });
+  }
+
+  return res.status(400).json({ error: 'Unsupported platform' });
+});
+
+// OAuth: Callback Handler (renders popup postMessage script)
+app.get(['/auth/callback', '/auth/callback/'], (req, res) => {
+  const platform = req.query.state || 'youtube';
+  const code = req.query.code || 'authorized';
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Account Authorization</title>
+        <style>
+          body { background: #09090b; color: #fff; font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+          .card { background: #18181b; padding: 24px 32px; border-radius: 12px; border: 1px solid #27272a; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <p><strong>Connecting your account...</strong></p>
+          <p style="font-size: 13px; color: #a1a1aa;">This window will close automatically.</p>
+        </div>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'OAUTH_AUTH_SUCCESS',
+              platform: '${platform}',
+              code: '${code}'
+            }, '*');
+            setTimeout(() => window.close(), 600);
+          } else {
+            window.location.href = '/';
+          }
+        </script>
+      </body>
+    </html>
+  `);
+});
+
 // Setup Vite in Dev or Static files in Production
 async function startServer() {
   if (!isProduction) {

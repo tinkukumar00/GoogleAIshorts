@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { VideoSource, ShortClip, SocialAccount, PublishJob } from './types/shorts';
+import { VideoSource, ShortClip, SocialAccount, UserProfile, PublishJob } from './types/shorts';
 import { extractYouTubeId, generateTimedCaptions, generateHashtags } from './utils/videoUtils';
 import { Header } from './components/Header';
 import { UrlInputBar } from './components/UrlInputBar';
@@ -9,16 +9,16 @@ import { ClipsFeed } from './components/ClipsFeed';
 import { ShortsStudioEditor } from './components/ShortsStudioEditor';
 import { PublishModal } from './components/PublishModal';
 import { AccountManagerModal } from './components/AccountManagerModal';
-import { Video, Sparkles, Send } from 'lucide-react';
+import { Video } from 'lucide-react';
 
-const INITIAL_ACCOUNTS: SocialAccount[] = [
+const DEFAULT_ACCOUNTS: SocialAccount[] = [
   {
     id: 'yt-main',
     platform: 'youtube',
     accountName: 'My YouTube Channel',
     handle: '@MyChannel',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
-    followerCount: 'Ready',
+    followerCount: 'Ready for Shorts',
     isConnected: true,
     canPublishShorts: true,
   },
@@ -28,22 +28,63 @@ const INITIAL_ACCOUNTS: SocialAccount[] = [
     accountName: 'My Instagram',
     handle: '@myaccount',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&h=120&q=80',
-    followerCount: 'Ready',
+    followerCount: 'Ready for Reels',
     isConnected: true,
     canPublishShorts: true,
   },
 ];
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('shortscraft_user');
+      return saved ? JSON.parse(saved) : {
+        name: 'Tinku Kumar',
+        email: 'tinkukumar00@gmail.com',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80',
+        isLoggedIn: true,
+      };
+    } catch {
+      return {
+        name: 'Tinku Kumar',
+        email: 'tinkukumar00@gmail.com',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80',
+        isLoggedIn: true,
+      };
+    }
+  });
+
+  const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('shortscraft_accounts');
+      return saved ? JSON.parse(saved) : DEFAULT_ACCOUNTS;
+    } catch {
+      return DEFAULT_ACCOUNTS;
+    }
+  });
+
   const [currentVideo, setCurrentVideo] = useState<VideoSource | null>(null);
   const [selectedClip, setSelectedClip] = useState<ShortClip | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Accounts & publishing modals state
-  const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>(INITIAL_ACCOUNTS);
+  // Modals state
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [clipToPublish, setClipToPublish] = useState<ShortClip | null>(null);
+
+  const handleUpdateUser = (u: UserProfile) => {
+    setCurrentUser(u);
+    try {
+      localStorage.setItem('shortscraft_user', JSON.stringify(u));
+    } catch {}
+  };
+
+  const handleUpdateAccounts = (accs: SocialAccount[]) => {
+    setConnectedAccounts(accs);
+    try {
+      localStorage.setItem('shortscraft_accounts', JSON.stringify(accs));
+    } catch {}
+  };
 
   // Handle URL Submission (1-click analysis)
   const handleAnalyzeUrl = async (url: string) => {
@@ -153,8 +194,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* Header */}
+      {/* Header with User Login and Channel Connections */}
       <Header
+        user={currentUser}
         connectedAccounts={connectedAccounts}
         onOpenAccounts={() => setIsAccountModalOpen(true)}
       />
@@ -223,12 +265,14 @@ export default function App() {
         />
       )}
 
-      {/* Account Settings Modal */}
+      {/* User Login & Channel Connections Modal */}
       <AccountManagerModal
+        user={currentUser}
         accounts={connectedAccounts}
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
-        onUpdateAccounts={setConnectedAccounts}
+        onUpdateUser={handleUpdateUser}
+        onUpdateAccounts={handleUpdateAccounts}
       />
     </div>
   );
