@@ -1,0 +1,6 @@
+{
+  "name": "ShortsCraft AI",
+  "description": "Turn long YouTube videos into viral 9:16 Shorts with AI hook detection, dynamic karaoke captions, auto-reframing, and 1-click publishing to YouTube and Instagram.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
