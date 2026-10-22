@@ -15,21 +15,21 @@ const DEFAULT_ACCOUNTS: SocialAccount[] = [
   {
     id: 'yt-main',
     platform: 'youtube',
-    accountName: 'My YouTube Channel',
-    handle: '@MyChannel',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
-    followerCount: 'Ready for Shorts',
-    isConnected: true,
+    accountName: 'YouTube Channel',
+    handle: '@NotConnected',
+    avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&h=120&q=80',
+    followerCount: 'Not Connected',
+    isConnected: false,
     canPublishShorts: true,
   },
   {
     id: 'ig-main',
     platform: 'instagram',
-    accountName: 'My Instagram',
-    handle: '@myaccount',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&h=120&q=80',
-    followerCount: 'Ready for Reels',
-    isConnected: true,
+    accountName: 'Instagram Account',
+    handle: '@NotConnected',
+    avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&h=120&q=80',
+    followerCount: 'Not Connected',
+    isConnected: false,
     canPublishShorts: true,
   },
 ];
@@ -39,29 +39,67 @@ export default function App() {
     try {
       const saved = localStorage.getItem('shortscraft_user');
       return saved ? JSON.parse(saved) : {
-        name: 'Tinku Kumar',
-        email: 'tinkukumar00@gmail.com',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80',
-        isLoggedIn: true,
+        name: 'Creator',
+        email: 'creator@example.com',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
+        isLoggedIn: false,
       };
     } catch {
       return {
-        name: 'Tinku Kumar',
-        email: 'tinkukumar00@gmail.com',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80',
-        isLoggedIn: true,
+        name: 'Creator',
+        email: 'creator@example.com',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
+        isLoggedIn: false,
       };
     }
   });
 
-  const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem('shortscraft_accounts');
-      return saved ? JSON.parse(saved) : DEFAULT_ACCOUNTS;
-    } catch {
-      return DEFAULT_ACCOUNTS;
+  const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>(DEFAULT_ACCOUNTS);
+
+  // Sync real YouTube account on mount if token is stored
+  React.useEffect(() => {
+    const token = localStorage.getItem('youtube_access_token');
+    if (token) {
+      fetch('/api/youtube/set-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token }),
+      })
+        .then(async (res) => {
+          const text = await res.text();
+          try {
+            return JSON.parse(text);
+          } catch {
+            return { success: false };
+          }
+        })
+        .then((data) => {
+          if (data && data.success && data.channel) {
+            setConnectedAccounts((prev) =>
+              prev.map((acc) =>
+                acc.platform === 'youtube'
+                  ? {
+                      ...acc,
+                      isConnected: true,
+                      accountName: data.channel.name,
+                      handle: data.channel.handle,
+                      avatar: data.channel.avatar,
+                      followerCount: data.channel.subscribers,
+                      lastSync: 'Live YouTube Account Synced',
+                    }
+                  : acc
+              )
+            );
+          } else if (data && !data.success) {
+            localStorage.removeItem('youtube_access_token');
+          }
+        })
+        .catch(() => {
+          // Token expired or invalid - clear stale token
+          localStorage.removeItem('youtube_access_token');
+        });
     }
-  });
+  }, []);
 
   const [currentVideo, setCurrentVideo] = useState<VideoSource | null>(null);
   const [selectedClip, setSelectedClip] = useState<ShortClip | null>(null);
@@ -192,6 +230,29 @@ export default function App() {
     }
   };
 
+  const handleUploadFile = async (fileName: string, fileData: string) => {
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch('/api/upload-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, fileData }),
+      });
+
+      if (res.ok) {
+        const source: VideoSource = await res.json();
+        setCurrentVideo(source);
+        if (source.generatedClips && source.generatedClips.length > 0) {
+          setSelectedClip(source.generatedClips[0]);
+        }
+      }
+    } catch (e) {
+      console.error('File upload error:', e);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Header with User Login and Channel Connections */}
@@ -203,9 +264,11 @@ export default function App() {
 
       {/* Main Content */}
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 space-y-8">
-        {/* Step 1: Paste a YouTube link */}
+        {/* Step 1: Paste a YouTube link or Upload MP4 Video File */}
         <UrlInputBar
           onAnalyze={handleAnalyzeUrl}
+          onUploadFile={handleUploadFile}
+          onOpenCookiesManager={() => setIsAccountModalOpen(true)}
           isAnalyzing={isAnalyzing}
         />
 

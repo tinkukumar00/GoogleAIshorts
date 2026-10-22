@@ -155,3 +155,48 @@ export function generateHashtags(category: string, count: number = 8): string[] 
   const merged = Array.from(new Set([...baseTags, ...selected]));
   return merged.slice(0, count);
 }
+
+/**
+ * Normalizes start and end timestamps for clipping, ensuring durations conform to YouTube Shorts constraints (5s - 60s).
+ */
+export function normalizeClipRange(
+  startTime?: number,
+  endTime?: number,
+  duration?: number,
+  maxDuration: number = 60
+): { startSec: number; endSec: number; durationSec: number } {
+  const startSec = Math.max(0, Math.floor(Number(startTime) || 0));
+  let endSec = Math.floor(Number(endTime) || 0);
+
+  if (endSec <= startSec) {
+    endSec = startSec + Math.max(10, Math.min(maxDuration, Number(duration) || 30));
+  }
+
+  const durationSec = Math.min(maxDuration, Math.max(5, endSec - startSec));
+  endSec = startSec + durationSec;
+
+  return { startSec, endSec, durationSec };
+}
+
+/**
+ * Returns the appropriate FFmpeg video filter for transforming horizontal video to vertical 9:16 Reels / Shorts.
+ * Supports pan positioning (0 = left speaker, 50 = center, 100 = right speaker).
+ */
+export function getFfmpegReframeFilter(mode: string = 'center-crop', panX: number = 50): string {
+  const panFraction = Math.max(0, Math.min(100, panX)) / 100;
+
+  switch (mode) {
+    case 'blur-fill':
+      return '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2';
+    case 'split-screen':
+      return '[0:v]scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[top];[0:v]scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960,hflip[bot];[top][bot]vstack';
+    case 'smart-face':
+    case 'center-crop':
+    default:
+      if (panX !== 50) {
+        return `scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-out_w)*${panFraction.toFixed(2)}:(in_h-out_h)/2,setsar=1`;
+      }
+      return 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-out_w)/2:(in_h-out_h)/2,setsar=1';
+  }
+}
+

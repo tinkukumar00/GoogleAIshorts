@@ -52,6 +52,7 @@ export interface ShortClip {
   previewThumbnail: string;
   youtubeId?: string;
   reframeMode: ReframeMode;
+  panX?: number; // Horizontal framing offset 0 (left) to 100 (right), default 50
   captionStyle: CaptionStyleId;
   aspectRatio: AspectRatio;
   status: 'ready' | 'rendering' | 'scheduled' | 'published';
